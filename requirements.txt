@@ -1,0 +1,7 @@
+numpy
+pandas
+xlsxwriter
+torch
+torchvision
+scikit-learn
+transformers
