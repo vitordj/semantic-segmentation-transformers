@@ -32,6 +32,8 @@ parser.add_argument('--apply_focal', type=int, default=1, help='Enable Focal Los
 parser.add_argument('--fl_alpha', type=float, default=0.25, help='Focal Loss alpha')
 parser.add_argument('--fl_gama', type=float, default=2.0, help='Focal Loss gama')
 
+parser.add_argument('--train_val_folder', action='store_true', default=False, help='Ignores KFold configuration and uses train and validation folders inside dataset_folder.')
+
 model_name = parser.parse_args().model_name
 
 batch_size = parser.parse_args().batch_size
@@ -53,6 +55,8 @@ apply_focal = parser.parse_args().apply_focal == 1
 fl_alpha = parser.parse_args().fl_alpha
 fl_gama = parser.parse_args().fl_gama
 
+ignore_kfold = parser.parse_args().train_val_folder
+
 # Dataset directory
 dataset_dir = f'{content_dir}{dataset_folder}'
 
@@ -73,12 +77,21 @@ dfs = []
 now = datetime.now() 
 date_time = now.strftime("%Y-%m-%d_%H:%M")
 
-for fold, (train_index, test_index) in enumerate(kf.split(np.arange(len(os.listdir(f'{dataset_dir}/images'))))):
+if ignore_kfold:
+    loops = [(0, (None, None))]
+else:
+    loops = enumerate(kf.split(np.arange(len(os.listdir(f'{dataset_dir}/images')))))
+
+for fold, (train_index, test_index) in loops:
     print(f"Fold {fold+1}")
 
-    # Create instances of the dataset for training and validation using the indices
-    train_dataset = SegformerSegmentationDataset(dataset_dir, image_processor, indices=train_index)
-    valid_dataset = SegformerSegmentationDataset(dataset_dir, image_processor, indices=test_index)
+    # Create instances of the dataset for training and validation using the indices or the folders, if training_val_folder arg is used.
+    if ignore_kfold:
+        train_dataset = SegformerSegmentationDataset(f'{dataset_dir}/train', image_processor)
+        valid_dataset = SegformerSegmentationDataset(f'{dataset_dir}/validation', image_processor)
+    else:
+        train_dataset = SegformerSegmentationDataset(dataset_dir, image_processor, indices=train_index)
+        valid_dataset = SegformerSegmentationDataset(dataset_dir, image_processor, indices=test_index)
 
     # Create DataLoaders for training and validation
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size)
@@ -115,6 +128,9 @@ for fold, (train_index, test_index) in enumerate(kf.split(np.arange(len(os.listd
 
     if save_model:
         torch.save(best_model, f'{content_dir}/output/segformer/{model_name.replace("/", ":")}_{date_time}_best_model_fold{fold+1:02d}.pth')
+    
+    if ignore_kfold:
+        break
 
 total_time = datetime.now() - now
 total_seconds = total_time.total_seconds()

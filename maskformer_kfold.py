@@ -34,6 +34,8 @@ parser.add_argument('--cross_entropy_weight', type=float, default=1.0, help='Wei
 parser.add_argument('--mask_weight', type=float, default=20.0, help='Weight for the focal loss in the mask loss')
 parser.add_argument('--class_weight', type=float, default=2.0, help='Weight for the classification loss')
 
+parser.add_argument('--train_val_folder', action='store_true', default=False, help='Ignores KFold configuration and uses train and validation folders inside dataset_folder.')
+
 model_name = parser.parse_args().model_name
 
 batch_size = parser.parse_args().batch_size
@@ -50,6 +52,8 @@ early_stopping_patience = parser.parse_args().early_stopping_patience
 content_dir = parser.parse_args().content_dir # must come as /folder
 dataset_folder = parser.parse_args().dataset_folder # must come as /folder
 save_model = parser.parse_args().save_model == 1 # Useful for when
+
+ignore_kfold = parser.parse_args().train_val_folder
 
 # Dataset directory
 dataset_dir = f'{content_dir}{dataset_folder}'
@@ -90,15 +94,28 @@ dfs = []
 now = datetime.now() 
 date_time = now.strftime("%Y-%m-%d_%H-%M-%S")
 
-for fold, (train_index, test_index) in enumerate(kf.split(np.arange(len(os.listdir(f'{dataset_dir}/images'))))):
+if ignore_kfold:
+    loops = [(0, (None, None))]
+else:
+    loops = enumerate(kf.split(np.arange(len(os.listdir(f'{dataset_dir}/images')))))
+
+for fold, (train_index, test_index) in loops:
     print(f"Fold {fold+1}")
 
     if _name == 'maskformer' or _name == 'mask2former':
-        train_dataset = MaskFormerSegmentationDataset(dataset_dir, image_processor, indices=train_index)
-        valid_dataset = MaskFormerSegmentationDataset(dataset_dir, image_processor, indices=test_index)
+        if ignore_kfold:
+            train_dataset = MaskFormerSegmentationDataset(f'{dataset_dir}/train', image_processor)
+            valid_dataset = MaskFormerSegmentationDataset(f'{dataset_dir}/validation', image_processor)
+        else:
+            train_dataset = MaskFormerSegmentationDataset(dataset_dir, image_processor, indices=train_index)
+            valid_dataset = MaskFormerSegmentationDataset(dataset_dir, image_processor, indices=test_index)
     elif _name == 'oneformer':
-        train_dataset = OneFormerSegmentationDataset(dataset_dir, image_processor, indices=train_index)
-        valid_dataset = OneFormerSegmentationDataset(dataset_dir, image_processor, indices=test_index)
+        if ignore_kfold:
+            train_dataset = OneFormerSegmentationDataset(f'{dataset_dir}/train', image_processor)
+            valid_dataset = OneFormerSegmentationDataset(f'{dataset_dir}/validation', image_processor)
+        else:
+            train_dataset = OneFormerSegmentationDataset(dataset_dir, image_processor, indices=train_index)
+            valid_dataset = OneFormerSegmentationDataset(dataset_dir, image_processor, indices=test_index)
 
     # Create DataLoaders for training and validation
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size)
