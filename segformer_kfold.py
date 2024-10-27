@@ -70,6 +70,9 @@ model_ = SegformerForSemanticSegmentation.from_pretrained(model_name, num_labels
 kf = KFold(n_splits=k_folds, shuffle=True, random_state=42)
 dfs = []
 
+now = datetime.now() 
+date_time = now.strftime("%Y-%m-%d_%H:%M")
+
 for fold, (train_index, test_index) in enumerate(kf.split(np.arange(len(os.listdir(f'{dataset_dir}/images'))))):
     print(f"Fold {fold+1}")
 
@@ -110,15 +113,15 @@ for fold, (train_index, test_index) in enumerate(kf.split(np.arange(len(os.listd
     df['fold'] = fold + 1
     dfs.append(df)
 
-    # if it is to actually train the final model, runs only 
     if save_model:
-        break
+        torch.save(best_model, f'{content_dir}/output/segformer/{model_name.replace("/", ":")}_{date_time}_best_model_fold{fold+1:02d}.pth')
 
-now = datetime.now() 
-date_time = now.strftime("%Y-%m-%d_%H:%M")
+total_time = datetime.now() - now
+total_seconds = total_time.total_seconds()
+minutes = total_seconds // 60
+seconds = total_seconds % 60
+
+print(f'Total iteration time: {int(minutes)} minutes and {int(seconds)} seconds.')
 
 df_all = pd.concat(dfs, ignore_index=True)
 df_all.to_excel(f'{content_dir}/output/segformer/{model_name.replace("/", ":")}_{date_time}_metrics.xlsx', index=False)
-
-if best_model:
-    torch.save(best_model, f'{content_dir}/output/segformer/{model_name.replace("/", ":")}_{date_time}_best_model.pth')
